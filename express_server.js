@@ -82,6 +82,16 @@ app.post('/logout', (req, res) => {
   res.redirect('/urls');
 });
 
+app.get('/register', (req, res) => {
+  const templateVars = { username: req.cookies.username };
+  res.render('register', templateVars);
+});
+
+app.post('/register', (req, res) => {
+  let email = req.body.email;
+  let password = req.body.password;
+});
+
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
