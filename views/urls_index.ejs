@@ -15,38 +15,55 @@
   <%- include('partials/_header') %>
     <main style="margin: 1em;">
       <h3>My URLs</h3>
-      <table class="table">
-        <thead>
-          <tr>
-            <th scope="col">Short URL</th>
-            <th scope="col">Long URL</th>
-            <th scope="col">EDIT</th>
-            <th scope="col">DELETE</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for(let url in urls) { %>
-            <tr>
-              <td>
-                <%= url %>
-              </td>
-              <td>
-                <%= urls[url].longURL %>
-              </td>
-              <td>
-                <button type='button' class='btn btn-success'>
-                  <a href="/urls/<%=url%>">EDIT</a>
-                </button>
-              </td>
-              <td>
-                <form method="POST" action="/urls/<%= url %>/delete">
-                  <button type='submit' class='btn btn-success'>DELETE</button>
-                </form>
-              </td>
-            </tr>
+
+      <% if (user) { %>
+        <% if (Object.keys(urls).length !==0) { %>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Short URL</th>
+                <th scope="col">Long URL</th>
+                <th scope="col">EDIT</th>
+                <th scope="col">DELETE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% for(let url in urls) { %>
+                <tr>
+                  <td>
+                    <%= url %>
+                  </td>
+                  <td>
+                    <%= urls[url].longURL %>
+                  </td>
+                  <td>
+                    <a href="/urls/<%=url%>">
+                      <button type='button' class='btn btn-primary'>EDIT
+                      </button>
+                    </a>
+                  </td>
+                  <td>
+                    <form method="POST" action="/urls/<%= url %>/delete">
+                      <button type='submit' class='btn btn-primary'>DELETE</button>
+                    </form>
+                  </td>
+                </tr>
+                <% } %>
+            </tbody>
+          </table>
+          <% } else { %>
+            <h4>You don't have any URLS</h4>
+            <a href="/urls/new">
+              <button class='btn btn-primary'>Add URL</button>
+            </a>
             <% } %>
-        </tbody>
-      </table>
+              <% } else { %>
+                <h4>Please login to view your URLs</h4>
+                <a href="/login">
+                  <button type='button' class='btn btn-primary'>Login</button>
+                </a>
+                <% } %>
     </main>
     <!-- Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
