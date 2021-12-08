@@ -6,9 +6,20 @@ const cookieParser = require('cookie-parser');
 
 app.set('view engine', 'ejs');
 
+// const urlDatabase = {
+//   b2xVn2: 'http://www.lighthouselabs.ca',
+//   '9sm5xK': 'http://www.google.com'
+// };
+
 const urlDatabase = {
-  b2xVn2: 'http://www.lighthouselabs.ca',
-  '9sm5xK': 'http://www.google.com'
+  b6UTxQ: {
+    longURL: 'https://www.tsn.ca',
+    userID: 'aJ48lW'
+  },
+  i3BoGr: {
+    longURL: 'https://www.google.ca',
+    userID: 'aJ48lW'
+  }
 };
 
 const users = {};
@@ -22,7 +33,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/u/:shortURL', (req, res) => {
-  res.redirect(urlDatabase[req.params.shortURL]);
+  if (urlDatabase[req.params.shortURL]) {
+    res.redirect(urlDatabase[req.params.shortURL].longURL);
+  } else {
+    res.send('Invalid short URL');
+  }
 });
 
 app.get('/urls', (req, res) => {
@@ -33,32 +48,41 @@ app.get('/urls', (req, res) => {
 
 app.post('/urls', (req, res) => {
   console.log(req.body);
-  let urlShort = generateRandomString();
-  let urlLong = req.body.longURL;
-  urlDatabase[urlShort] = urlLong;
-  res.redirect(`/urls/${urlShort}`);
+  let shortURL = generateRandomString();
+  let longURL = req.body.longURL;
+  let userID = req.cookies.user_id;
+  urlDatabase[shortURL] = { longURL, userID };
+  res.redirect(`/urls/${shortURL}`);
 });
 
 app.get('/urls/new', (req, res) => {
   let user_id = req.cookies.user_id;
-  const templateVars = { user: users[user_id] };
-  res.render('urls_new', templateVars);
+  if (user_id) {
+    const templateVars = { user: users[user_id] };
+    res.render('urls_new', templateVars);
+  } else {
+    res.redirect('/login');
+  }
 });
 
 app.get('/urls/:shortURL', (req, res) => {
   let shortURL = req.params.shortURL;
-  let longURL = urlDatabase[shortURL];
+  let longURL = urlDatabase[shortURL].longURL;
   let user_id = req.cookies.user_id;
 
   const templateVars = { shortURL, longURL, user: users[user_id] };
   res.render('urls_show', templateVars);
 });
 
-app.post('/urls/:id', (req, res) => {
-  let shortURL = req.params.id;
+app.post('/urls/:shortURL', (req, res) => {
+  let shortURL = req.params.shortURL;
   let newLongURL = req.body.newLongURL;
-  urlDatabase[shortURL] = newLongURL;
-  res.redirect('/urls');
+  if (newLongURL) {
+    urlDatabase[shortURL].longURL = newLongURL;
+    res.redirect('/urls');
+  } else {
+    res.send('No URL entered');
+  }
 });
 
 app.post('/urls/:shortURL/delete', (req, res) => {
