@@ -75,16 +75,35 @@ app.get('/hello', (req, res) => {
   res.send('<html><body>Hello <b>World</b></body></html>\n');
 });
 
-app.post('/login', (req, res) => {
-  let email = req.body.email;
+app.get('/login', (req, res) => {
+  let user_id = req.cookies.user_id;
+  const templateVars = { user: users[user_id] };
+  res.render('login', templateVars);
+});
 
-  for (let value of Object.values(users)) {
-    if (value.email === email) {
-      res.cookie('user_id', value.id);
+app.post('/login', (req, res) => {
+  let { email, password } = req.body;
+
+  let user = searchUser(email);
+
+  if (!email || !password) {
+    res.statusCode = 400;
+    res.send('400 - missing email or password');
+  } else {
+    if (user) {
+      //* happy path
+      if (user.password === password) {
+        res.cookie('user_id', user.id);
+        res.redirect('/urls');
+      } else {
+        res.statusCode = 400;
+        res.send('password does not match');
+      }
+    } else {
+      res.statusCode = 400;
+      res.send('user does not exist');
     }
   }
-
-  res.redirect('/urls');
 });
 
 app.post('/logout', (req, res) => {
@@ -107,7 +126,7 @@ app.post('/register', (req, res) => {
   if (!email || !password) {
     res.statusCode = 400;
     res.send('400 - missing email or password');
-  } else if (emailExists(email)) {
+  } else if (searchUser(email)) {
     // 2. email exists
     res.statusCode = 400;
     res.send('400 - email already exists');
@@ -128,18 +147,11 @@ app.listen(PORT, () => {
 });
 
 function generateRandomString() {
-  // let randomString = '';
-  // for (let i = 0; i < 6; i++) {
-  //   let asciiCode = Math.floor(Math.random() * 26) + 97;
-  //   randomString += String.fromCharCode(asciiCode);
-  // }
-  // return randomString;
   return Math.random().toString(36).substring(2, 8);
 }
 
-function emailExists(email) {
+function searchUser(email) {
   for (let user of Object.values(users)) {
-    if (user.email === email) return true;
+    if (user.email === email) return user;
   }
-  return false;
 }

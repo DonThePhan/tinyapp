@@ -14,16 +14,17 @@
     <% if (user && user.email) { %>
       <form method='POST' action="/logout">
         <label for="">
-          Logged in as <%= user.email %>
+          Logged in as: <%= user.email %>
         </label>
         <button type='submit' class="btn btn-outline-dark">Logout</button>
       </form>
       <% } else { %>
-        <form method='POST' action="/login">
-          <label for="email">Enter email</label>
-          <input name='email' type="text" placeholder="email">
+        <a href="/register">
+          <button type='submit' class="btn btn-outline-dark">Register</button>
+        </a>
+        <a href="/login">
           <button type='submit' class="btn btn-outline-dark">Login</button>
-        </form>
+        </a>
         <% } %>
   </nav>
 </header>
