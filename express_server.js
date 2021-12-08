@@ -101,13 +101,26 @@ app.get('/register', (req, res) => {
 app.post('/register', (req, res) => {
   let email = req.body.email;
   let password = req.body.password;
-  let id = generateRandomString();
 
-  users[id] = { id, email, password };
-  console.log(users);
+  /** handle errors: */
+  // 1. no email or password
+  if (!email || !password) {
+    res.statusCode = 400;
+    res.send('400 - missing email or password');
+  } else if (emailExists(email)) {
+    // 2. email exists
+    res.statusCode = 400;
+    res.send('400 - email already exists');
+  } else {
+    /** else continue */
+    let id = generateRandomString();
 
-  res.cookie('user_id', id);
-  res.redirect('/urls');
+    users[id] = { id, email, password };
+    console.log(users);
+
+    res.cookie('user_id', id);
+    res.redirect('/urls');
+  }
 });
 
 app.listen(PORT, () => {
@@ -122,4 +135,11 @@ function generateRandomString() {
   // }
   // return randomString;
   return Math.random().toString(36).substring(2, 8);
+}
+
+function emailExists(email) {
+  for (let user of Object.values(users)) {
+    if (user.email === email) return true;
+  }
+  return false;
 }
