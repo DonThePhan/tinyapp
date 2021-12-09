@@ -19,7 +19,7 @@
             <%= shortURL %>
           </a></p>
         <h2>Edit</h2>
-        <form method='post' action="<%= shortURL %>">
+        <form method='POST' action="<%= shortURL %>?_method=PUT">
           <label for="newLongURL">New URL</label>
           <input id='newLongURL' type="text" name='newLongURL' placeholder="http://www....">
           <button type='submit' class='btn btn-success'>UPDATE</button>
