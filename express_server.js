@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const bcrypt = require('bcryptjs');
 const PORT = 8080; // default port 8080
 
 const app = express();
@@ -11,7 +12,7 @@ const users = {
   aJ48lW: {
     user_id: 'aJ48lW',
     email: 'donthephan@gmail.com',
-    password: 'asdf'
+    hashedPassword: /* 'asdf' */ `$2a$10$Qmb6FZ70vI2Cq./YRcKZgOI2zfaV7eKi5ZKbuMC.tzg7jUGfJv4la`
   }
 };
 const urlDatabase = {
@@ -32,6 +33,10 @@ app.use(cookieParser());
 /** ROUTES */
 app.get('/', (req, res) => {
   res.redirect('/urls');
+});
+
+app.get('/database', (req, res) => {
+  res.json({ users, urlDatabase });
 });
 
 app.get('/u/:shortURL', (req, res) => {
@@ -156,7 +161,7 @@ app.post('/login', (req, res) => {
   } else {
     if (user) {
       //* happy path
-      if (user.password === password) {
+      if (bcrypt.compareSync(password, user.hashedPassword)) {
         res.cookie('user_id', user.user_id);
         res.redirect('/urls');
       } else {
@@ -184,8 +189,7 @@ app.get('/register', (req, res) => {
 app.post('/register', (req, res) => {
   let email = req.body.email;
   let password = req.body.password;
-
-  console.log(email, password);
+  let hashedPassword = bcrypt.hashSync(password, 10);
 
   /** handle errors: */
   // 1. no email or password
@@ -200,7 +204,7 @@ app.post('/register', (req, res) => {
     /** else continue */
     let user_id = generateRandomString();
 
-    users[user_id] = { user_id, email, password };
+    users[user_id] = { user_id, email, hashedPassword };
     console.log(users);
 
     // redirect w/ POST request & body to login
