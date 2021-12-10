@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
-const { getUserByEmail } = require('./helpers.js');
+const { getUserByEmail, accessCheck } = require('./helpers.js');
 const methodOverride = require('method-override');
 const requestIp = require('request-ip');
 const PORT = 8080; // default port 8080
@@ -40,7 +40,6 @@ const urlDatabase = {
 
 /** MIDDLEWARE */
 app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(cookieParser());
 app.use(
   cookieSession({
     name: 'session',
@@ -55,6 +54,12 @@ app.use(methodOverride('_method'));
 app.use(requestIp.mw());
 
 /** ROUTES */
+
+// View databases
+// app.get('/database', (req, res) => {
+//   res.json({ users, urlDatabase });
+// });
+
 app.get('/', (req, res) => {
   let user_id = req.session.user_id;
   if (user_id && users[user_id]) {
@@ -64,17 +69,12 @@ app.get('/', (req, res) => {
   }
 });
 
-app.get('/database', (req, res) => {
-  res.json({ users, urlDatabase });
-});
-
 app.get('/u/:shortURL', (req, res) => {
   let shortURL = req.params.shortURL;
   let urlData = urlDatabase[shortURL];
 
   if (urlData) {
     //* happy path
-
     urlData.visited++;
 
     const ip = req.clientIp;
@@ -91,22 +91,22 @@ app.get('/u/:shortURL', (req, res) => {
 });
 
 app.get('/urls', (req, res) => {
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
 
   let filteredUrlDatabase = Object.fromEntries(
     Object.entries(urlDatabase).filter(([ key, value ]) => value.user_id === user_id)
   );
+
   const templateVars = { urls: filteredUrlDatabase, user: users[user_id] };
   res.render('urls_index', templateVars);
 });
 
 app.post('/urls', (req, res) => {
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
   let user = users[user_id];
 
   if (user) {
+    //* happy path
     let shortURL = generateRandomString();
     let longURL = req.body.longURL;
 
@@ -125,7 +125,6 @@ app.post('/urls', (req, res) => {
 });
 
 app.get('/urls/new', (req, res) => {
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
   if (user_id) {
     const templateVars = { user: users[user_id] };
@@ -137,7 +136,6 @@ app.get('/urls/new', (req, res) => {
 
 app.get('/urls/:shortURL', (req, res) => {
   let urlData = urlDatabase[req.params.shortURL];
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
 
   let { invalidAccess, accessDenialHandler } = accessCheck(urlData, user_id);
@@ -161,7 +159,6 @@ app.put('/urls/:shortURL', (req, res) => {
   let newLongURL = req.body.newLongURL;
 
   let urlData = urlDatabase[req.params.shortURL];
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
 
   let { invalidAccess, accessDenialHandler } = accessCheck(urlData, user_id);
@@ -178,7 +175,6 @@ app.put('/urls/:shortURL', (req, res) => {
 
 app.delete('/urls/:shortURL', (req, res) => {
   let urlData = urlDatabase[req.params.shortURL];
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
 
   let { invalidAccess, accessDenialHandler } = accessCheck(urlData, user_id);
@@ -191,12 +187,7 @@ app.delete('/urls/:shortURL', (req, res) => {
   }
 });
 
-app.get('/urls.json', (req, res) => {
-  res.json(urlDatabase);
-});
-
 app.get('/login', (req, res) => {
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
   if (!user_id) {
     const templateVars = { user: users[user_id] };
@@ -217,7 +208,6 @@ app.post('/login', (req, res) => {
     if (user) {
       //* happy path
       if (bcrypt.compareSync(password, user.hashedPassword)) {
-        // res.cookie('user_id', user.user_id);
         req.session.user_id = user.user_id;
         res.redirect('/urls');
       } else {
@@ -230,13 +220,11 @@ app.post('/login', (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
-  // res.clearCookie('user_id');
   req.session = null;
   res.redirect('/urls');
 });
 
 app.get('/register', (req, res) => {
-  // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
   if (!user_id) {
     const templateVars = { user: users[user_id] };
@@ -251,15 +239,14 @@ app.post('/register', (req, res) => {
   let password = req.body.password;
   let hashedPassword = bcrypt.hashSync(password, 10);
 
-  /** handle errors: */
   // 1. no email or password
   if (!email || !password) {
     res.status(400).send('400 - missing email or password');
   } else if (getUserByEmail(email, users)) {
-    // 2. email exists
+    // 2. email already exists
     res.status(400).send('400 - email already exists');
   } else {
-    /** else continue */
+    //* else happy path
     let user_id = generateRandomString();
 
     users[user_id] = { user_id, email, hashedPassword };
@@ -275,21 +262,4 @@ app.listen(PORT, () => {
 
 function generateRandomString() {
   return Math.random().toString(36).substring(2, 8);
-}
-
-function accessCheck(urlData, user_id) {
-  let invalidAccess = false;
-  const accessDenialHandler = function(res, urlData, user_id) {
-    if (!urlData) {
-      res.status(400).send('400 - Invalid short URL');
-    } else if (!user_id) {
-      res.status(400).send('400 - Please login to see your URLs');
-    } else if (urlData.user_id !== user_id) {
-      res.status(400).send('400 - Access restricted. Please log onto the correct account to view this URL');
-    }
-  };
-  if (!urlData || !user_id || urlData.user_id !== user_id) {
-    invalidAccess = true;
-  }
-  return { invalidAccess, accessDenialHandler };
 }
