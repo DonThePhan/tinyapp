@@ -15,9 +15,12 @@
       <div class="card-body">
         <h5 class="card-title">TinyURL for: <%= longURL %>
         </h5>
-        <p class="card-text">Short URL: <a href="/u/<%= shortURL %>">
+        <p class="card-text"><b>Short URL:</b> <a href="/u/<%= shortURL %>">
             <%= shortURL %>
           </a></p>
+        <p class="card-text"><b>Created</b>: <%= created %>
+        </p>
+
         <h2>Edit</h2>
         <form method='POST' action="<%= shortURL %>?_method=PUT">
           <label for="newLongURL">New URL</label>
@@ -26,6 +29,28 @@
         </form>
       </div>
       <div class="card-footer text-muted"></div>
+    </div>
+    <div>
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th scope="col">Date Visited</th>
+            <th scope="col">User IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for(let log of visitorLog) { %>
+            <tr>
+              <td>
+                <%=log.date%>
+              </td>
+              <td>
+                <%=log.id %>
+              </td>
+            </tr>
+            <% } %>
+        </tbody>
+      </table>
     </div>
     <!-- Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"

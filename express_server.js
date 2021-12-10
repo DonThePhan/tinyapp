@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
 const { getUserByEmail } = require('./helpers.js');
 const methodOverride = require('method-override');
+const requestIp = require('request-ip');
 const PORT = 8080; // default port 8080
 
 const app = express();
@@ -21,11 +22,19 @@ const users = {
 const urlDatabase = {
   b6UTxQ: {
     longURL: 'https://www.tsn.ca',
-    user_id: 'aJ48lW'
+    user_id: 'aJ48lW',
+    visited: 0,
+    visitors: [],
+    visitorLog: [],
+    created: new Date()
   },
   i3BoGr: {
     longURL: 'https://www.google.ca',
-    user_id: 'aJ48lW'
+    user_id: 'aJ48lW',
+    visited: 0,
+    visitors: [],
+    visitorLog: [],
+    created: new Date()
   }
 };
 
@@ -43,6 +52,7 @@ app.use(
   })
 );
 app.use(methodOverride('_method'));
+app.use(requestIp.mw());
 
 /** ROUTES */
 app.get('/', (req, res) => {
@@ -60,24 +70,29 @@ app.get('/database', (req, res) => {
 
 app.get('/u/:shortURL', (req, res) => {
   let shortURL = req.params.shortURL;
-  // let user_id = req.cookies.user_id;
-  let user_id = req.session.user_id;
   let urlData = urlDatabase[shortURL];
 
-  let { invalidAccess, accessDenialHandler } = accessCheck(urlData, user_id);
-
-  if (invalidAccess) {
-    accessDenialHandler(res, urlData, user_id);
-  } else {
+  if (urlData) {
     //* happy path
+
+    urlData.visited++;
+
+    const ip = req.clientIp;
+    if (!urlData.visitors.includes(ip)) {
+      urlData.visitors.push(ip);
+    }
+
+    urlData.visitorLog.push({ date: new Date(), id: ip });
+
     res.redirect(urlDatabase[shortURL].longURL);
+  } else {
+    res.status(400).send('400 - requested link does not exist');
   }
 });
 
 app.get('/urls', (req, res) => {
   // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
-  console.log(user_id);
 
   let filteredUrlDatabase = Object.fromEntries(
     Object.entries(urlDatabase).filter(([ key, value ]) => value.user_id === user_id)
@@ -94,11 +109,15 @@ app.post('/urls', (req, res) => {
   if (user) {
     let shortURL = generateRandomString();
     let longURL = req.body.longURL;
-    let date = new Date();
-    let timesShortURLVisited = 0;
-    let uniqueVisits = 0;
 
-    urlDatabase[shortURL] = { longURL, user_id };
+    urlDatabase[shortURL] = {
+      longURL,
+      user_id,
+      visited: 0,
+      visitors: [],
+      visitorLog: [],
+      created: new Date()
+    };
     res.redirect(`/urls/${shortURL}`);
   } else {
     res.send('Request Denied. Please log in');
@@ -130,7 +149,9 @@ app.get('/urls/:shortURL', (req, res) => {
     const templateVars = {
       shortURL: req.params.shortURL,
       longURL: urlData.longURL,
-      user: users[user_id]
+      created: urlData.created,
+      user: users[user_id],
+      visitorLog: urlDatabase[req.params.shortURL].visitorLog
     };
     res.render('urls_show', templateVars);
   }
@@ -177,8 +198,12 @@ app.get('/urls.json', (req, res) => {
 app.get('/login', (req, res) => {
   // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
-  const templateVars = { user: users[user_id] };
-  res.render('login', templateVars);
+  if (!user_id) {
+    const templateVars = { user: users[user_id] };
+    res.render('login', templateVars);
+  } else {
+    res.redirect('/urls');
+  }
 });
 
 app.post('/login', (req, res) => {
@@ -187,8 +212,7 @@ app.post('/login', (req, res) => {
   let user = getUserByEmail(email, users);
 
   if (!email || !password) {
-    res.statusCode = 400;
-    res.send('400 - missing email or password');
+    res.status(400).send('400 - missing email or password');
   } else {
     if (user) {
       //* happy path
@@ -197,27 +221,29 @@ app.post('/login', (req, res) => {
         req.session.user_id = user.user_id;
         res.redirect('/urls');
       } else {
-        res.statusCode = 400;
-        res.send('password does not match');
+        res.status(400).send('400 - password does not match');
       }
     } else {
-      res.statusCode = 400;
-      res.send('user does not exist');
+      res.status(400).send('400 - user does not exist');
     }
   }
 });
 
 app.post('/logout', (req, res) => {
   // res.clearCookie('user_id');
-  req.session.user_id = '';
+  req.session = null;
   res.redirect('/urls');
 });
 
 app.get('/register', (req, res) => {
   // let user_id = req.cookies.user_id;
   let user_id = req.session.user_id;
-  const templateVars = { user: users[user_id] };
-  res.render('register', templateVars);
+  if (!user_id) {
+    const templateVars = { user: users[user_id] };
+    res.render('register', templateVars);
+  } else {
+    res.redirect('/urls');
+  }
 });
 
 app.post('/register', (req, res) => {
@@ -228,18 +254,15 @@ app.post('/register', (req, res) => {
   /** handle errors: */
   // 1. no email or password
   if (!email || !password) {
-    res.statusCode = 400;
-    res.send('400 - missing email or password');
+    res.status(400).send('400 - missing email or password');
   } else if (getUserByEmail(email, users)) {
     // 2. email exists
-    res.statusCode = 400;
-    res.send('400 - email already exists');
+    res.status(400).send('400 - email already exists');
   } else {
     /** else continue */
     let user_id = generateRandomString();
 
     users[user_id] = { user_id, email, hashedPassword };
-    console.log(users);
 
     // redirect w/ POST request & body to login
     res.redirect(307, '/login');
@@ -258,11 +281,11 @@ function accessCheck(urlData, user_id) {
   let invalidAccess = false;
   const accessDenialHandler = function(res, urlData, user_id) {
     if (!urlData) {
-      res.send('Invalid short URL');
+      res.status(400).send('400 - Invalid short URL');
     } else if (!user_id) {
-      res.send('Please login to see your URLs');
+      res.status(400).send('400 - Please login to see your URLs');
     } else if (urlData.user_id !== user_id) {
-      res.send('Access restricted. Please log onto the correct account to view this URL');
+      res.status(400).send('400 - Access restricted. Please log onto the correct account to view this URL');
     }
   };
   if (!urlData || !user_id || urlData.user_id !== user_id) {
